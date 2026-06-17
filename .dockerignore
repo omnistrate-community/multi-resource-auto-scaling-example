@@ -1,0 +1,25 @@
+.env
+.omnistrate.password
+.terraform
+.terraform.lock.hcl
+.DS_Store
+.dockerignore
+.DS_Store
+.git
+.github
+.omnistrate
+.github
+
+# Binaries
+main
+
+# Vendor dependencies
+vendor/
+
+# IDE/editor config files
+.vscode/
+.idea/
+
+# binaries
+controller
+custom-auto-scaling-example

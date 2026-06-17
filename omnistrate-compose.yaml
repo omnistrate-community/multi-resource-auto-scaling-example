@@ -1,0 +1,47 @@
+version: '3.9'
+x-customer-integrations:
+  logs:
+  metrics:
+
+x-omnistrate-load-balancer:
+  https:
+    - name: frontend
+      description: L7 Load Balancer to expose the controller Web UI
+      paths:
+        - associatedResourceKey: controller
+          path: /
+          backendPort: 3000
+
+services:
+
+  controller:
+    depends_on:
+      - api
+      - worker
+    image: ghcr.io/omnistrate-community/multi-resource-auto-scaling-example:0.0.1
+    ports:
+      - '3000:3000'
+    environment:
+      - AUTOSCALER_COOLDOWN=300
+      - AUTOSCALER_TARGET_RESOURCES=api,worker
+      - AUTOSCALER_STEPS=1
+
+  api:
+    x-omnistrate-mode-internal: true
+    x-omnistrate-capabilities:
+      autoscaling:
+        policyType: custom
+        maxReplicas: 5
+        minReplicas: 1
+    image: hashicorp/http-echo:1.0.0
+    command: ['-text=api resource']
+
+  worker:
+    x-omnistrate-mode-internal: true
+    x-omnistrate-capabilities:
+      autoscaling:
+        policyType: custom
+        maxReplicas: 3
+        minReplicas: 0
+    image: busybox:1.37.0
+    command: ['sh', '-c', 'while true; do echo Working...; sleep 10; done']
