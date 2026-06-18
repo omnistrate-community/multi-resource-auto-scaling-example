@@ -3,7 +3,7 @@ module github.com/omnistrate-community/multi-resource-auto-scaling-example
 go 1.25.0
 
 require (
-	github.com/go-jose/go-jose/v4 v4.1.3
+	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/go-openapi/strfmt v0.26.3
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/pkg/errors v0.9.1
