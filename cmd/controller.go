@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -254,7 +255,18 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	config := autoScaler.GetConfig()
-	_, err := fmt.Fprintf(w, `
+	targetResources := config.TargetResources
+	if len(targetResources) == 0 {
+		targetResources = []string{config.TargetResource}
+	}
+	targetResourcesJSON, err := json.Marshal(targetResources)
+	if err != nil {
+		logger.Warn().Err(err).Msg("Failed to marshal target resources")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	targetResourcesLabel := strings.Join(targetResources, ", ")
+	_, err = fmt.Fprintf(w, `
 <!DOCTYPE html>
 <html>
 <head>
@@ -489,7 +501,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
             
             <div class="config-box">
                 <div class="config-line">
-                    <span class="label">Target Resource</span>
+                    <span class="label">Target Resources</span>
                     <span class="value">%s</span>
                 </div>
                 <div class="config-line">
@@ -520,6 +532,8 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
     </div>
     
     <script>
+        const targetResources = %s;
+
         function updateTimestamp() {
             const now = new Date();
             document.getElementById('timestamp').textContent = 
@@ -549,6 +563,27 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
                 const data = await response.json();
                 
                 if (response.ok) {
+                    if (data.resources) {
+                        let statusDisplay = '<div class="status-line success"><strong>✓ Status Retrieved</strong></div>' +
+                            '<div class="status-line" style="margin: 16px 0; border-top: 1px solid #e2e8f0;"></div>';
+
+                        Object.keys(data.resources).sort().forEach(function(resource) {
+                            const resourceStatus = data.resources[resource];
+                            const statusClass = resourceStatus.status === 'FAILED' ? 'error' : 'success';
+                            statusDisplay += '<div class="status-line ' + statusClass + '"><strong>Resource:</strong> ' + resource + '</div>';
+                            statusDisplay += '<div class="status-line ' + statusClass + '"><strong>Status:</strong> ' + resourceStatus.status + '</div>';
+                            statusDisplay += '<div class="status-line ' + statusClass + '"><strong>Current Capacity:</strong> ' + resourceStatus.currentCapacity + '</div>';
+                            statusDisplay += '<div class="status-line" style="margin: 10px 0; border-top: 1px solid #e2e8f0;"></div>';
+                        });
+
+                        if (data.scalingInProgress) {
+                            statusDisplay += '<div class="status-line" style="color: #667eea;">⚡ Scaling in progress...</div>';
+                        }
+
+                        displayStatus(statusDisplay);
+                        return;
+                    }
+
                     const isFailed = data.status === 'FAILED';
                     const statusClass = isFailed ? 'error' : 'success';
                     
@@ -621,10 +656,20 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
             
             showLoading(true);
             try {
+                const payload = {};
+                if (targetResources.length > 1) {
+                    payload.targets = {};
+                    targetResources.forEach(function(resource) {
+                        payload.targets[resource] = capacity;
+                    });
+                } else {
+                    payload.targetCapacity = capacity;
+                }
+
                 const response = await fetch('/scale', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ targetCapacity: capacity })
+                    body: JSON.stringify(payload)
                 });
                 
                 const data = await response.json();
@@ -640,14 +685,24 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
                     // If current status is included in the error response, display it first
                     let errorDisplay = '';
                     if (data.currentStatus) {
-                        const isFailed = data.currentStatus.status === 'FAILED';
-                        const statusClass = isFailed ? 'error' : 'success';
-                        
-                        errorDisplay = '<div class="status-line ' + statusClass + '"><strong>Current Status:</strong></div>' +
-                            '<div class="status-line ' + statusClass + '"><strong>Resource:</strong> ' + data.currentStatus.resourceAlias + '</div>' +
-                            '<div class="status-line ' + statusClass + '"><strong>Status:</strong> ' + data.currentStatus.status + '</div>' +
-                            '<div class="status-line ' + statusClass + '"><strong>Capacity:</strong> ' + data.currentStatus.currentCapacity + '</div>' +
-                            '<div class="status-line" style="margin: 16px 0; border-top: 1px solid #e2e8f0;"></div>';
+                        if (data.currentStatus.resources) {
+                            errorDisplay = '<div class="status-line"><strong>Current Status:</strong></div>';
+                            Object.keys(data.currentStatus.resources).sort().forEach(function(resource) {
+                                const resourceStatus = data.currentStatus.resources[resource];
+                                const statusClass = resourceStatus.status === 'FAILED' ? 'error' : 'success';
+                                errorDisplay += '<div class="status-line ' + statusClass + '"><strong>Resource:</strong> ' + resource + ', <strong>Status:</strong> ' + resourceStatus.status + ', <strong>Capacity:</strong> ' + resourceStatus.currentCapacity + '</div>';
+                            });
+                            errorDisplay += '<div class="status-line" style="margin: 16px 0; border-top: 1px solid #e2e8f0;"></div>';
+                        } else {
+							const isFailed = data.currentStatus.status === 'FAILED';
+							const statusClass = isFailed ? 'error' : 'success';
+
+							errorDisplay = '<div class="status-line ' + statusClass + '"><strong>Current Status:</strong></div>' +
+                                '<div class="status-line ' + statusClass + '"><strong>Resource:</strong> ' + data.currentStatus.resourceAlias + '</div>' +
+                                '<div class="status-line ' + statusClass + '"><strong>Status:</strong> ' + data.currentStatus.status + '</div>' +
+                                '<div class="status-line ' + statusClass + '"><strong>Capacity:</strong> ' + data.currentStatus.currentCapacity + '</div>' +
+                                '<div class="status-line" style="margin: 16px 0; border-top: 1px solid #e2e8f0;"></div>';
+                        }
                     }
                     
                     // Add error message below status
@@ -681,7 +736,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
     </script>
 </body>
 </html>
-`, config.TargetResource, config.CooldownDuration)
+`, targetResourcesLabel, config.CooldownDuration, string(targetResourcesJSON))
 	if err != nil {
 		logger.Warn().Err(err).Msg("Failed to write HTML response")
 		w.WriteHeader(http.StatusInternalServerError)
