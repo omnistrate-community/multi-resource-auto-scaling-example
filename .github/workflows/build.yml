@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
                 
       - name: Set up go
         timeout-minutes: 10
@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
                 
       - name: Set up go
         timeout-minutes: 10
@@ -92,7 +92,7 @@ jobs:
       group: Bump-Version-'${{ github.workflow }}'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Bump version and push tag
         id: tag_version
