@@ -30,18 +30,13 @@ func NewConfigFromEnv() (*Config, error) {
 		return nil, fmt.Errorf("invalid AUTOSCALER_COOLDOWN value: %s", cooldownStr)
 	}
 
-	// Get target resources. AUTOSCALER_TARGET_RESOURCE remains supported for
-	// existing single-resource deployments.
+	// Get target resources.
 	targetResources, err := parseTargetResources(os.Getenv("AUTOSCALER_TARGET_RESOURCES"))
 	if err != nil {
 		return nil, err
 	}
 	if len(targetResources) == 0 {
-		targetResource := strings.TrimSpace(os.Getenv("AUTOSCALER_TARGET_RESOURCE"))
-		if targetResource == "" {
-			return nil, fmt.Errorf("AUTOSCALER_TARGET_RESOURCES or AUTOSCALER_TARGET_RESOURCE environment variable is required")
-		}
-		targetResources = []string{targetResource}
+		return nil, fmt.Errorf("AUTOSCALER_TARGET_RESOURCES environment variable is required")
 	}
 
 	// Get steps

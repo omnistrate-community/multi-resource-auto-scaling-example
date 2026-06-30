@@ -7,8 +7,7 @@ It is based on the single-resource custom autoscaling pattern, but adds:
 - `AUTOSCALER_TARGET_RESOURCES` for comma-separated resource aliases.
 - `POST /scale` support for grouped targets via `{"targets":{"api":3,"worker":2}}`.
 - grouped monitoring sidecar requests to `/resources/capacity/add` and `/resources/capacity/remove`.
-- backward compatibility for the old single-resource env var and request body.
-- unit coverage for both the old single-resource path and the new grouped path.
+- unit coverage for both grouped scaling and single-resource shorthand requests.
 
 ## Architecture
 
@@ -21,14 +20,13 @@ The controller runs inside the Omnistrate instance and talks to the local monito
 5. The controller sends at most one grouped add request and one grouped remove request to the monitoring sidecar.
 6. Omnistrate service orchestration applies the requested capacity changes to the named resources.
 
-Single-resource callers can continue to use `AUTOSCALER_TARGET_RESOURCE` and `{"targetCapacity":2}`.
+When the request body uses `{"targetCapacity":2}`, the controller scales the first alias listed in `AUTOSCALER_TARGET_RESOURCES`.
 
 ## Configuration
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `AUTOSCALER_TARGET_RESOURCES` | Comma-separated resource aliases to scale, for example `api,worker` | - | Preferred |
-| `AUTOSCALER_TARGET_RESOURCE` | Legacy single resource alias. Used when `AUTOSCALER_TARGET_RESOURCES` is unset | - | Backward compatible fallback |
+| `AUTOSCALER_TARGET_RESOURCES` | Comma-separated resource aliases to scale, for example `api,worker` | - | Yes |
 | `AUTOSCALER_COOLDOWN` | Cooldown period in seconds between scaling operations | 300 | No |
 | `AUTOSCALER_STEPS` | Max capacity units to add/remove per resource per operation | 1 | No |
 | `AUTOSCALER_WAIT_FOR_ACTIVE_TIMEOUT` | Max time to wait for a resource to become `ACTIVE`, in seconds | 900 | No |
@@ -100,17 +98,15 @@ The controller will compare each target against current capacity and send groupe
 }
 ```
 
-### Legacy Single-Resource Scale
+### Single-Resource Scale Shorthand
 
-This request remains supported:
+This request scales the first alias listed in `AUTOSCALER_TARGET_RESOURCES`:
 
 ```bash
 curl -X POST http://localhost:3000/scale \
   -H 'Content-Type: application/json' \
   -d '{"targetCapacity":2}'
 ```
-
-When `AUTOSCALER_TARGET_RESOURCES` is unset, the controller falls back to `AUTOSCALER_TARGET_RESOURCE`.
 
 ### Status
 
@@ -138,10 +134,9 @@ make run
 The repo includes focused coverage for:
 
 - plural `AUTOSCALER_TARGET_RESOURCES` parsing.
-- fallback from `AUTOSCALER_TARGET_RESOURCE`.
 - grouped add/remove sidecar payloads.
 - multi-resource autoscaler validation and batching.
-- existing single-resource autoscaler behavior.
+- single-resource shorthand behavior.
 
 Run everything:
 
@@ -152,7 +147,7 @@ go test ./...
 ## Files to Start With
 
 - `cmd/controller.go`: REST API and status handlers.
-- `internal/config/config.go`: env parsing and backward compatibility.
+- `internal/config/config.go`: env parsing.
 - `internal/autoscaler/autoscaler.go`: single-resource and multi-resource scaling logic.
 - `internal/omnistrate_api/client.go`: monitoring sidecar API client.
 - `omnistrate-compose.yaml`: runnable Omnistrate service example.

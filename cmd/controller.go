@@ -750,7 +750,6 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
  * The controller reads configuration from environment variables:
  * - AUTOSCALER_COOLDOWN: Cooldown period in seconds (default: 300)
  * - AUTOSCALER_TARGET_RESOURCES: Comma-separated resource aliases to scale
- * - AUTOSCALER_TARGET_RESOURCE: Legacy single-resource alias fallback
  *
  * It exposes HTTP endpoints:
  * - POST /scale: Scale one resource or grouped resources to target capacity
@@ -803,7 +802,6 @@ func main() {
 		logger.Info().Str("port", port).Msg("Starting autoscaler controller")
 		logger.Info().Msg("Environment variables required:")
 		logger.Info().Msg("  - AUTOSCALER_TARGET_RESOURCES: Resource aliases to scale")
-		logger.Info().Msg("  - AUTOSCALER_TARGET_RESOURCE: Legacy single-resource alias fallback")
 		logger.Info().Msg("  - AUTOSCALER_COOLDOWN: Cooldown period in seconds (optional)")
 		logger.Info().Msg("  - AUTOSCALER_STEPS: Number of steps for scaling (optional)")
 		logger.Info().Msg("")

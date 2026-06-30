@@ -20,8 +20,8 @@ type controllerTestClient struct {
 	capacities    map[string][]omnistrate_api.ResourceInstanceCapacity
 	adds          []omnistrate_api.ResourceCapacityChange
 	removes       []omnistrate_api.ResourceCapacityChange
-	legacyAdds    []omnistrate_api.ResourceCapacityChange
-	legacyRemoves []omnistrate_api.ResourceCapacityChange
+	singleAdds    []omnistrate_api.ResourceCapacityChange
+	singleRemoves []omnistrate_api.ResourceCapacityChange
 }
 
 func (c *controllerTestClient) GetCurrentCapacity(_ context.Context, resourceAlias string) (omnistrate_api.ResourceInstanceCapacity, error) {
@@ -47,7 +47,7 @@ func (c *controllerTestClient) AddCapacity(_ context.Context, resourceAlias stri
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.legacyAdds = append(c.legacyAdds, omnistrate_api.ResourceCapacityChange{
+	c.singleAdds = append(c.singleAdds, omnistrate_api.ResourceCapacityChange{
 		ResourceAlias:     resourceAlias,
 		CapacityToBeAdded: capacityToBeAdded,
 	})
@@ -58,7 +58,7 @@ func (c *controllerTestClient) RemoveCapacity(_ context.Context, resourceAlias s
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.legacyRemoves = append(c.legacyRemoves, omnistrate_api.ResourceCapacityChange{
+	c.singleRemoves = append(c.singleRemoves, omnistrate_api.ResourceCapacityChange{
 		ResourceAlias:       resourceAlias,
 		CapacityToBeRemoved: capacityToBeRemoved,
 	})
@@ -81,7 +81,7 @@ func (c *controllerTestClient) RemoveCapacities(_ context.Context, changes []omn
 	return omnistrate_api.ResourceInstances{Resources: []omnistrate_api.ResourceInstance{}}, nil
 }
 
-func TestScaleHandlerLegacyRequest(t *testing.T) {
+func TestScaleHandlerSingleResourceShorthandRequest(t *testing.T) {
 	client := &controllerTestClient{
 		capacities: map[string][]omnistrate_api.ResourceInstanceCapacity{
 			"worker": {
@@ -106,11 +106,11 @@ func TestScaleHandlerLegacyRequest(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
 	}
-	if len(client.legacyAdds) != 1 {
-		t.Fatalf("expected one legacy add call, got %d", len(client.legacyAdds))
+	if len(client.singleAdds) != 1 {
+		t.Fatalf("expected one single-resource add call, got %d", len(client.singleAdds))
 	}
-	if client.legacyAdds[0].ResourceAlias != "worker" || client.legacyAdds[0].CapacityToBeAdded != 1 {
-		t.Fatalf("unexpected legacy add: %#v", client.legacyAdds[0])
+	if client.singleAdds[0].ResourceAlias != "worker" || client.singleAdds[0].CapacityToBeAdded != 1 {
+		t.Fatalf("unexpected single-resource add: %#v", client.singleAdds[0])
 	}
 }
 
