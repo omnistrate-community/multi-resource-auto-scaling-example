@@ -97,9 +97,9 @@ Expected response shape:
 
 The controller only sends grouped add/remove requests for resources that are currently `ACTIVE`.
 
-## Legacy Single-Resource API
+## Single-Resource Sidecar API
 
-The original single-resource paths remain supported for backward compatibility:
+The controller uses the single-resource sidecar paths when a scale request targets one configured resource:
 
 ```http
 POST /resource/{resourceAlias}/capacity/add
@@ -123,7 +123,7 @@ Single-resource remove request:
 }
 ```
 
-The controller still uses these paths when the caller sends the legacy request body:
+The controller uses these paths when the caller sends the single-resource shorthand request body:
 
 ```json
 {
@@ -133,7 +133,7 @@ The controller still uses these paths when the caller sends the legacy request b
 
 ## Controller API
 
-### New Pattern
+### Multi-Resource Pattern
 
 ```http
 POST /scale
@@ -151,7 +151,7 @@ Content-Type: application/json
 
 Every key in `targets` must be listed in `AUTOSCALER_TARGET_RESOURCES`.
 
-### Old Pattern
+### Single-Resource Shorthand
 
 ```http
 POST /scale
@@ -164,12 +164,11 @@ Content-Type: application/json
 }
 ```
 
-This scales the first configured resource. If `AUTOSCALER_TARGET_RESOURCES` is unset, it scales `AUTOSCALER_TARGET_RESOURCE`.
+This scales the first configured resource from `AUTOSCALER_TARGET_RESOURCES`.
 
 ## Implementation Notes
 
 - `AUTOSCALER_TARGET_RESOURCES=api,worker` enables grouped scaling.
-- `AUTOSCALER_TARGET_RESOURCE=worker` remains valid for existing deployments.
 - `AUTOSCALER_STEPS` caps the change per resource in each grouped request.
 - The controller may send one add batch and one remove batch for the same scaling decision.
 - Service orchestration applies each requested resource change in parallel on the platform side.
@@ -180,7 +179,6 @@ This scales the first configured resource. If `AUTOSCALER_TARGET_RESOURCES` is u
 This example includes tests for:
 
 - grouped sidecar payloads for add and remove.
-- old `AUTOSCALER_TARGET_RESOURCE` fallback.
-- new `AUTOSCALER_TARGET_RESOURCES` parsing.
-- old single-resource autoscaling behavior.
-- new multi-resource target validation and grouped batching.
+- `AUTOSCALER_TARGET_RESOURCES` parsing.
+- single-resource shorthand behavior.
+- multi-resource target validation and grouped batching.

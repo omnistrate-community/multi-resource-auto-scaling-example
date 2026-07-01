@@ -17,7 +17,7 @@ import (
 func createTestAutoscaler(t *testing.T, client omnistrate_api.Client) *Autoscaler {
 	// Set required env vars for config
 	t.Setenv("AUTOSCALER_COOLDOWN", "0")
-	t.Setenv("AUTOSCALER_TARGET_RESOURCE", "test-resource")
+	t.Setenv("AUTOSCALER_TARGET_RESOURCES", "test-resource")
 	t.Setenv("AUTOSCALER_STEPS", "1")
 	t.Setenv("DRY_RUN", "true")
 	t.Setenv("AUTOSCALER_WAIT_FOR_ACTIVE_TIMEOUT", "10")
@@ -684,7 +684,7 @@ func TestGetStatus_WithCooldown(t *testing.T) {
 	mockClient := new(MockClient)
 	// Create autoscaler with 5 second cooldown
 	t.Setenv("AUTOSCALER_COOLDOWN", "5")
-	t.Setenv("AUTOSCALER_TARGET_RESOURCE", "test-resource")
+	t.Setenv("AUTOSCALER_TARGET_RESOURCES", "test-resource")
 	t.Setenv("AUTOSCALER_STEPS", "1")
 	t.Setenv("DRY_RUN", "true")
 	t.Setenv("AUTOSCALER_WAIT_FOR_ACTIVE_TIMEOUT", "10")
