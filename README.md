@@ -37,6 +37,21 @@ When the request body uses `{"targetCapacity":2}`, the controller scales the fir
 ## Example Compose
 
 ```yaml
+x-omnistrate-load-balancer:
+  https:
+    - name: frontend
+      description: L7 Load Balancer to expose the controller Web UI and API
+      paths:
+        - associatedResourceKey: controller
+          path: /
+          backendPort: 3000
+        - associatedResourceKey: controller
+          path: /scale
+          backendPort: 3000
+        - associatedResourceKey: controller
+          path: /status
+          backendPort: 3000
+
 services:
   controller:
     depends_on:
