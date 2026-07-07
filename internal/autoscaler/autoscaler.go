@@ -226,6 +226,10 @@ func (a *Autoscaler) ScaleTargets(ctx context.Context, targets map[string]int) e
 		a.mu.Lock()
 		a.lastActionTime = time.Now()
 		a.mu.Unlock()
+
+		if err := a.waitForGroupedCapacityProgress(ctx, capacities, adds, removes); err != nil {
+			return err
+		}
 	}
 }
 
@@ -320,6 +324,62 @@ func isReadyForGroupedScaling(capacity omnistrate_api.ResourceInstanceCapacity, 
 		return true
 	}
 	return capacity.CurrentCapacity == 0 && target > 0
+}
+
+func (a *Autoscaler) waitForGroupedCapacityProgress(
+	ctx context.Context,
+	previousCapacities map[string]omnistrate_api.ResourceInstanceCapacity,
+	adds []omnistrate_api.ResourceCapacityChange,
+	removes []omnistrate_api.ResourceCapacityChange,
+) error {
+	expectedDirections := make(map[string]int, len(adds)+len(removes))
+	for _, change := range adds {
+		expectedDirections[change.ResourceAlias] = 1
+	}
+	for _, change := range removes {
+		expectedDirections[change.ResourceAlias] = -1
+	}
+	if len(expectedDirections) == 0 {
+		return nil
+	}
+
+	timeout := time.After(a.config.WaitForActiveTimeout)
+	ticker := time.NewTicker(a.config.WaitForActiveCheckInterval)
+	defer ticker.Stop()
+
+	for {
+		capacities, err := a.getCurrentCapacities(ctx, expectedDirections)
+		if err != nil {
+			logger.Warn().Err(err).Msg("Error checking grouped scaling progress")
+		} else {
+			allProgressed := true
+			for resource, direction := range expectedDirections {
+				capacity := capacities[resource]
+				if capacity.Status == omnistrate_api.FAILED {
+					return fmt.Errorf("resource %s is in FAILED state", resource)
+				}
+
+				previous := previousCapacities[resource].CurrentCapacity
+				switch {
+				case direction > 0 && capacity.CurrentCapacity <= previous:
+					allProgressed = false
+				case direction < 0 && capacity.CurrentCapacity >= previous:
+					allProgressed = false
+				}
+			}
+			if allProgressed {
+				return nil
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for grouped capacity operation to make progress")
+		case <-ticker.C:
+		}
+	}
 }
 
 // waitForActiveState waits for the instance to be in ACTIVE state
