@@ -293,7 +293,7 @@ func (a *Autoscaler) waitForActiveCapacities(ctx context.Context, targets map[st
 				if capacity.Status == omnistrate_api.FAILED {
 					return nil, fmt.Errorf("resource %s is in FAILED state", resource)
 				}
-				if capacity.Status != omnistrate_api.ACTIVE {
+				if !isReadyForGroupedScaling(capacity, targets[resource]) {
 					allActive = false
 				}
 			}
@@ -310,6 +310,16 @@ func (a *Autoscaler) waitForActiveCapacities(ctx context.Context, targets map[st
 		case <-ticker.C:
 		}
 	}
+}
+
+func isReadyForGroupedScaling(capacity omnistrate_api.ResourceInstanceCapacity, target int) bool {
+	if capacity.Status == omnistrate_api.ACTIVE {
+		return true
+	}
+	if capacity.CurrentCapacity == target {
+		return true
+	}
+	return capacity.CurrentCapacity == 0 && target > 0
 }
 
 // waitForActiveState waits for the instance to be in ACTIVE state
