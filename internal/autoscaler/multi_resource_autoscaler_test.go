@@ -128,6 +128,37 @@ func TestScaleTargetsRepeatsUntilAllTargetsReached(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
+func TestScaleTargetsAddsFromZeroReplicaResources(t *testing.T) {
+	mockClient := new(MockClient)
+	autoscaler := createMultiResourceTestAutoscaler(mockClient)
+	ctx := context.Background()
+
+	mockClient.On("GetCurrentCapacity", ctx, "api").Return(omnistrate_api.ResourceInstanceCapacity{
+		Status: omnistrate_api.Status("UNKNOWN"), ResourceAlias: "api", CurrentCapacity: 0,
+	}, nil).Once()
+	mockClient.On("GetCurrentCapacity", ctx, "worker").Return(omnistrate_api.ResourceInstanceCapacity{
+		Status: omnistrate_api.Status("DEPLOYING"), ResourceAlias: "worker", CurrentCapacity: 0,
+	}, nil).Once()
+	mockClient.On("AddCapacities", ctx, []omnistrate_api.ResourceCapacityChange{
+		{ResourceAlias: "api", CapacityToBeAdded: 1},
+		{ResourceAlias: "worker", CapacityToBeAdded: 1},
+	}).Return(omnistrate_api.ResourceInstances{}, nil).Once()
+	mockClient.On("GetCurrentCapacity", ctx, "api").Return(omnistrate_api.ResourceInstanceCapacity{
+		Status: omnistrate_api.ACTIVE, ResourceAlias: "api", CurrentCapacity: 1,
+	}, nil).Once()
+	mockClient.On("GetCurrentCapacity", ctx, "worker").Return(omnistrate_api.ResourceInstanceCapacity{
+		Status: omnistrate_api.ACTIVE, ResourceAlias: "worker", CurrentCapacity: 1,
+	}, nil).Once()
+
+	err := autoscaler.ScaleTargets(ctx, map[string]int{
+		"api":    1,
+		"worker": 1,
+	})
+
+	assert.NoError(t, err)
+	mockClient.AssertExpectations(t)
+}
+
 func TestScaleTargetsRejectsUnknownResource(t *testing.T) {
 	mockClient := new(MockClient)
 	autoscaler := createMultiResourceTestAutoscaler(mockClient)
