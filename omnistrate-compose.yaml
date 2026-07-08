@@ -24,21 +24,23 @@ services:
     depends_on:
       - api
       - worker
-    image: ghcr.io/omnistrate-community/multi-resource-auto-scaling-example:0.0.1
+    image: ghcr.io/omnistrate-community/multi-resource-auto-scaling-example:0.0.13
     ports:
       - '3000:3000'
     environment:
-      - AUTOSCALER_COOLDOWN=300
+      - AUTOSCALER_COOLDOWN=0
       - AUTOSCALER_TARGET_RESOURCES=api,worker
-      - AUTOSCALER_STEPS=1
+      - AUTOSCALER_STEPS=2
+      - AUTOSCALER_WAIT_FOR_ACTIVE_TIMEOUT=1800
+      - AUTOSCALER_WAIT_FOR_ACTIVE_CHECK_INTERVAL=15
 
   api:
     x-omnistrate-mode-internal: true
     x-omnistrate-capabilities:
       autoscaling:
         policyType: custom
-        maxReplicas: 5
-        minReplicas: 1
+        maxReplicas: 2
+        minReplicas: 0
     image: hashicorp/http-echo:1.0.0
     command: ['-text=api resource']
 
@@ -47,7 +49,7 @@ services:
     x-omnistrate-capabilities:
       autoscaling:
         policyType: custom
-        maxReplicas: 3
+        maxReplicas: 2
         minReplicas: 0
     image: busybox:1.37.0
     command: ['sh', '-c', 'while true; do echo Working...; sleep 10; done']
