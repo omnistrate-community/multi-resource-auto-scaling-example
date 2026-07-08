@@ -24,6 +24,20 @@ type controllerTestClient struct {
 	singleRemoves []omnistrate_api.ResourceCapacityChange
 }
 
+func TestHTTPServerAllowsLongRunningScaleResponses(t *testing.T) {
+	server := newHTTPServer("3000")
+
+	if server.WriteTimeout != 0 {
+		t.Fatalf("expected no write timeout for long-running /scale responses, got %v", server.WriteTimeout)
+	}
+	if server.ReadHeaderTimeout != 30*time.Second {
+		t.Fatalf("expected read header timeout 30s, got %v", server.ReadHeaderTimeout)
+	}
+	if server.ReadTimeout != 30*time.Second {
+		t.Fatalf("expected read timeout 30s, got %v", server.ReadTimeout)
+	}
+}
+
 func (c *controllerTestClient) GetCurrentCapacity(_ context.Context, resourceAlias string) (omnistrate_api.ResourceInstanceCapacity, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

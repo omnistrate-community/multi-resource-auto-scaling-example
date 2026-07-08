@@ -791,12 +791,7 @@ func main() {
 		port = envPort
 	}
 
-	server := &http.Server{
-		Addr:         ":" + port,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
+	server := newHTTPServer(port)
 
 	go func() {
 		logger.Info().Str("port", port).Msg("Starting autoscaler controller")
@@ -826,4 +821,16 @@ func main() {
 	}
 
 	logger.Info().Msg("Autoscaler controller stopped")
+}
+
+func newHTTPServer(port string) *http.Server {
+	return &http.Server{
+		Addr:              ":" + port,
+		ReadHeaderTimeout: 30 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		// /scale waits for grouped capacity operations to make progress before
+		// replying. A fixed write timeout can close that long-running response.
+		WriteTimeout: 0,
+		IdleTimeout:  60 * time.Second,
+	}
 }
