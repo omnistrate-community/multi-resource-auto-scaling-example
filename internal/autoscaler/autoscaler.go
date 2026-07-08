@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -317,6 +318,9 @@ func (a *Autoscaler) waitForActiveCapacities(ctx context.Context, targets map[st
 }
 
 func isReadyForGroupedScaling(capacity omnistrate_api.ResourceInstanceCapacity, target int) bool {
+	if isCapacityOperationInProgress(capacity.Status) {
+		return false
+	}
 	if capacity.Status == omnistrate_api.ACTIVE {
 		return true
 	}
@@ -324,6 +328,15 @@ func isReadyForGroupedScaling(capacity omnistrate_api.ResourceInstanceCapacity, 
 		return true
 	}
 	return capacity.CurrentCapacity == 0 && target > 0
+}
+
+func isCapacityOperationInProgress(status omnistrate_api.Status) bool {
+	switch strings.ToUpper(string(status)) {
+	case "MODIFYING", "SCALING", "SCALING_UP", "SCALING_DOWN":
+		return true
+	default:
+		return false
+	}
 }
 
 func (a *Autoscaler) waitForGroupedCapacityProgress(
@@ -357,6 +370,10 @@ func (a *Autoscaler) waitForGroupedCapacityProgress(
 				capacity := capacities[resource]
 				if capacity.Status == omnistrate_api.FAILED {
 					return fmt.Errorf("resource %s is in FAILED state", resource)
+				}
+				if isCapacityOperationInProgress(capacity.Status) {
+					allProgressed = false
+					continue
 				}
 
 				previous := previousCapacities[resource].CurrentCapacity

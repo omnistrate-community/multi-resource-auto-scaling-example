@@ -197,6 +197,53 @@ func TestScaleTargetsWaitsForProgressAfterGroupedAddFromZero(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
+func TestScaleTargetsWaitsForGroupedRemoveToFinishBeforeReturning(t *testing.T) {
+	mockClient := new(MockClient)
+	autoscaler := createMultiResourceTestAutoscaler(mockClient)
+	ctx := context.Background()
+
+	mockClient.On("GetCurrentCapacity", ctx, "api").Return(omnistrate_api.ResourceInstanceCapacity{
+		Status: omnistrate_api.ACTIVE, ResourceAlias: "api", CurrentCapacity: 1,
+	}, nil).Once()
+	mockClient.On("GetCurrentCapacity", ctx, "worker").Return(omnistrate_api.ResourceInstanceCapacity{
+		Status: omnistrate_api.ACTIVE, ResourceAlias: "worker", CurrentCapacity: 1,
+	}, nil).Once()
+	mockClient.On("RemoveCapacities", ctx, []omnistrate_api.ResourceCapacityChange{
+		{ResourceAlias: "api", CapacityToBeRemoved: 1},
+		{ResourceAlias: "worker", CapacityToBeRemoved: 1},
+	}).Return(omnistrate_api.ResourceInstances{}, nil).Once()
+
+	mockClient.On("GetCurrentCapacity", ctx, "api").Return(omnistrate_api.ResourceInstanceCapacity{
+		Status: omnistrate_api.Status("MODIFYING"), ResourceAlias: "api", CurrentCapacity: 0,
+	}, nil).Once()
+	mockClient.On("GetCurrentCapacity", ctx, "worker").Return(omnistrate_api.ResourceInstanceCapacity{
+		Status: omnistrate_api.Status("MODIFYING"), ResourceAlias: "worker", CurrentCapacity: 0,
+	}, nil).Once()
+	mockClient.On("GetCurrentCapacity", ctx, "api").Return(omnistrate_api.ResourceInstanceCapacity{
+		Status: omnistrate_api.ACTIVE, ResourceAlias: "api", CurrentCapacity: 0,
+	}, nil).Twice()
+	mockClient.On("GetCurrentCapacity", ctx, "worker").Return(omnistrate_api.ResourceInstanceCapacity{
+		Status: omnistrate_api.ACTIVE, ResourceAlias: "worker", CurrentCapacity: 0,
+	}, nil).Twice()
+
+	err := autoscaler.ScaleTargets(ctx, map[string]int{
+		"api":    0,
+		"worker": 0,
+	})
+
+	assert.NoError(t, err)
+	mockClient.AssertExpectations(t)
+}
+
+func TestIsReadyForGroupedScalingRejectsInProgressZeroCapacity(t *testing.T) {
+	ready := isReadyForGroupedScaling(omnistrate_api.ResourceInstanceCapacity{
+		Status:          omnistrate_api.Status("MODIFYING"),
+		CurrentCapacity: 0,
+	}, 2)
+
+	assert.False(t, ready)
+}
+
 func TestScaleTargetsRejectsUnknownResource(t *testing.T) {
 	mockClient := new(MockClient)
 	autoscaler := createMultiResourceTestAutoscaler(mockClient)
