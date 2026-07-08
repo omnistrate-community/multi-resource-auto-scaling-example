@@ -24,7 +24,7 @@ services:
     depends_on:
       - api
       - worker
-    image: ghcr.io/omnistrate-community/multi-resource-auto-scaling-example:0.0.13
+    image: ghcr.io/omnistrate-community/multi-resource-auto-scaling-example:0.0.15
     ports:
       - '3000:3000'
     environment:
