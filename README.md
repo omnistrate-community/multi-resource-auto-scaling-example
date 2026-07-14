@@ -1,14 +1,13 @@
 # Multi-Resource Custom Auto Scaling Example for Omnistrate
 
-This repository is a reference implementation for custom autoscaling that changes capacity for multiple Omnistrate Resources in the same instance through grouped capacity operations.
+This repository is a reference implementation for custom autoscaling that can change capacity for multiple Omnistrate resources in the same instance at the same time.
 
 It is based on the single-resource custom autoscaling pattern, but adds:
 
 - `AUTOSCALER_TARGET_RESOURCES` for comma-separated resource aliases.
 - `POST /scale` support for grouped targets via `{"targets":{"api":3,"worker":2}}`.
 - grouped monitoring sidecar requests to `/resources/capacity/add` and `/resources/capacity/remove`.
-- a single-resource shorthand request via `{"targetCapacity":2}`.
-- progress polling so `/scale` waits for grouped capacity changes to advance before returning.
+- unit coverage for both grouped scaling and single-resource shorthand requests.
 
 ## Architecture
 
@@ -18,9 +17,8 @@ The controller runs inside the Omnistrate instance and talks to the local monito
 2. The controller checks each requested resource's current capacity.
 3. The controller validates that every requested resource is configured in `AUTOSCALER_TARGET_RESOURCES`.
 4. The controller builds add and remove batches.
-5. The controller sends at most one grouped add request and one grouped remove request to the monitoring sidecar for each scaling iteration.
-6. Omnistrate service orchestration applies the requested capacity changes to the named Resources.
-7. The controller polls capacity until every requested Resource reaches its target, or the configured timeout expires.
+5. The controller sends at most one grouped add request and one grouped remove request to the monitoring sidecar.
+6. Omnistrate service orchestration applies the requested capacity changes to the named resources.
 
 When the request body uses `{"targetCapacity":2}`, the controller scales the first alias listed in `AUTOSCALER_TARGET_RESOURCES`.
 
@@ -92,16 +90,6 @@ services:
 
 ## Controller API
 
-The controller listens on port `3000` by default and exposes:
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| `POST` | `/scale` | Scale one Resource or several configured Resources to target capacities |
-| `GET` | `/status` | Return current capacity and scaling state |
-| `GET` | `/health` | Return a basic health response |
-
-`POST /scale` is synchronous: the request can remain open while the controller waits for the capacity operation to make progress. The controller returns HTTP `409` if another scaling operation is already in progress.
-
 ### Multi-Resource Scale
 
 ```bash
@@ -127,8 +115,6 @@ The controller will compare each target against current capacity and send groupe
 }
 ```
 
-Each target is validated against `AUTOSCALER_TARGET_RESOURCES`. A target may be zero when the Resource allows scaling to zero. If a target differs from the current capacity by more than `AUTOSCALER_STEPS`, the controller repeats grouped operations until the target is reached.
-
 ### Single-Resource Scale Shorthand
 
 This request scales the first alias listed in `AUTOSCALER_TARGET_RESOURCES`:
@@ -146,8 +132,6 @@ curl http://localhost:3000/status
 ```
 
 With multiple target resources configured, status returns per-resource capacity and lifecycle state. With one configured resource, the response keeps the existing single-resource shape.
-
-For the exact monitoring sidecar request and response payloads used by this example, see [OMNISTRATE_API_GUIDE.md](OMNISTRATE_API_GUIDE.md).
 
 ## Local Development
 
@@ -168,8 +152,7 @@ The repo includes focused coverage for:
 
 - plural `AUTOSCALER_TARGET_RESOURCES` parsing.
 - grouped add/remove sidecar payloads.
-- multi-resource target validation and batching.
-- grouped scaling from zero replicas and progress polling.
+- multi-resource autoscaler validation and batching.
 - single-resource shorthand behavior.
 
 Run everything:
